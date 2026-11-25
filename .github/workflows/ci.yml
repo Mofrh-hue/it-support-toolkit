@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  bash:
+    name: Bash - ShellCheck + Bats
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Make scripts executable
+        run: chmod +x bash/*.sh tests/bash/fixtures/*.sh
+
+      - name: Lint with ShellCheck
+        run: shellcheck bash/*.sh tests/bash/fixtures/*.sh
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install Bats
+        run: npm install --no-audit --no-fund
+
+      - name: Run Bats tests
+        run: npx bats tests/bash
+
+  powershell:
+    name: PowerShell - ScriptAnalyzer + Pester (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Pester and PSScriptAnalyzer
+        run: |
+          Set-PSRepository PSGallery -InstallationPolicy Trusted
+          Install-Module Pester -MinimumVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck
+          Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+
+      - name: Lint with PSScriptAnalyzer
+        run: |
+          $issues = Invoke-ScriptAnalyzer -Path ./powershell -Recurse -Severity Warning, Error
+          $issues | Format-Table RuleName, ScriptName, Line, Message -AutoSize -Wrap
+          if ($issues) { throw "PSScriptAnalyzer found $($issues.Count) issue(s)." }
+
+      - name: Run Pester tests
+        run: |
+          Import-Module Pester -MinimumVersion 5.5.0
+          $config = New-PesterConfiguration
+          $config.Run.Path = './tests/powershell'
+          $config.Run.Exit = $true
+          $config.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $config
