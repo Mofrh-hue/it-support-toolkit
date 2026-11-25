@@ -1,0 +1,13 @@
+{
+  "name": "it-support-toolkit",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Test runner dependency for the Bash scripts (Bats).",
+  "scripts": {
+    "lint": "shellcheck bash/*.sh tests/bash/fixtures/*.sh",
+    "test": "bats tests/bash"
+  },
+  "devDependencies": {
+    "bats": "1.11.1"
+  }
+}
